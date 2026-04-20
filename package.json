@@ -1,28 +1,11 @@
 {
-  "name": "express-rest-api",
+  "name": "slash-command-express",
   "version": "1.0.0",
-  "description": "Express REST API server for Vercel deployment",
-  "main": "api/index.js",
-  "type": "commonjs",
+  "main": "server.js",
   "scripts": {
-    "start": "node api/index.js",
-    "dev": "nodemon api/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node server.js"
   },
-  "keywords": [
-    "express",
-    "rest",
-    "api",
-    "vercel"
-  ],
-  "author": "",
-  "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.3.1"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.1"
+    "express": "^5.1.0"
   }
 }
