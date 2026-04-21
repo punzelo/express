@@ -6,32 +6,44 @@ let lunchItems = [
   { id: 5, name: '파스타', category: '양식' }
 ];
 
-function pickRandomLunch() {
-  if (lunchItems.length === 0) {
-    throw new Error('등록된 메뉴가 없습니다.');
+function pickRandomLunch(filterText = '') {
+  let candidates = lunchItems;
+
+  if (filterText && filterText.trim()) {
+    const keyword = filterText.trim().toLowerCase();
+    candidates = lunchItems.filter((item) => {
+      return (
+        item.name.toLowerCase().includes(keyword) ||
+        item.category.toLowerCase().includes(keyword)
+      );
+    });
   }
 
-  const index = Math.floor(Math.random() * lunchItems.length);
-  return lunchItems[index];
+  if (candidates.length === 0) {
+    throw new Error('조건에 맞는 메뉴가 없습니다.');
+  }
+
+  const index = Math.floor(Math.random() * candidates.length);
+  return candidates[index];
 }
 
 function addLunchItem({ name, category }) {
   const newItem = {
     id: lunchItems.length ? lunchItems[lunchItems.length - 1].id + 1 : 1,
     name,
-    category
+    category: category || '기타'
   };
 
   lunchItems.push(newItem);
   return newItem;
 }
 
-function getAllLunchItems() {
-  return lunchItems;
+function findById(id) {
+  return lunchItems.find((item) => item.id === Number(id));
 }
 
 module.exports = {
   pickRandomLunch,
   addLunchItem,
-  getAllLunchItems
+  findById
 };
