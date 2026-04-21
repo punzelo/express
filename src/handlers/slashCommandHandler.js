@@ -6,39 +6,12 @@ const {
   buildDoorayLunchMessage,
   buildDoorayRegisteredMessage,
   buildDoorayError,
-  buildDoorayAccepted,
   buildDoorayMbtiQuestionMessage,
   buildDoorayMbtiResultMessage,
   buildDoorayMbtiStatsMessage,
   buildDoorayBlindVoteMessage,
   buildDoorayBlindVoteResultMessage
 } = require('../utils/responseBuilder');
-
-function sleep(ms) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
-function waitUntil(promise) {
-  promise.catch((error) => {
-    console.error('Background task failed:', error);
-  });
-}
-
-async function postToDoorayResponseUrl(responseUrl, payload) {
-  const response = await fetch(responseUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(payload)
-  });
-
-  if (!response.ok) {
-    throw new Error(`Dooray responseUrl POST failed with status ${response.status}`);
-  }
-}
 
 function verifyAppToken(req) {
   const expectedToken = process.env.DOORAY_APP_TOKEN;
@@ -56,60 +29,6 @@ function parseLunchNewText(rawText = '') {
   const category = (categoryRaw || '기타').trim();
 
   return { name, category };
-}
-
-async function sendDelayedMbtiStart({ responseUrl, userId }) {
-  await sleep(250);
-
-  try {
-    const session = mbtiService.createSession(userId);
-    const question = mbtiService.getCurrentQuestion(session.id);
-
-    await postToDoorayResponseUrl(
-      responseUrl,
-      buildDoorayMbtiQuestionMessage({
-        sessionId: session.id,
-        question,
-        step: 1,
-        total: 4
-      })
-    );
-  } catch (error) {
-    await postToDoorayResponseUrl(
-      responseUrl,
-      buildDoorayError(error.message || 'MBTI 시작 중 오류가 발생했습니다.')
-    );
-  }
-}
-
-async function sendDelayedBlindVoteStart({ responseUrl, creatorId, rawText }) {
-  await sleep(250);
-
-  try {
-    const parsed = blindVoteService.parseVoteText(rawText);
-
-    const poll = blindVoteService.createPoll({
-      creatorId,
-      question: parsed.question,
-      options: parsed.options,
-      revealProgress: parsed.revealProgress
-    });
-
-    await postToDoorayResponseUrl(
-      responseUrl,
-      buildDoorayBlindVoteMessage(poll, {
-        responseType: 'inChannel',
-        text: parsed.revealProgress
-          ? '익명 투표가 생성되었습니다. 중간 결과 공개: ON'
-          : '익명 투표가 생성되었습니다. 중간 결과 공개: OFF'
-      })
-    );
-  } catch (error) {
-    await postToDoorayResponseUrl(
-      responseUrl,
-      buildDoorayError(error.message || '익명 투표 생성 중 오류가 발생했습니다.')
-    );
-  }
 }
 
 async function startRecommendLunch(req, res) {
@@ -222,22 +141,17 @@ async function startMbti(req, res) {
       return res.status(401).json(buildDoorayError('유효하지 않은 appToken 입니다.'));
     }
 
-    const responseUrl = (req.body || {}).responseUrl || '';
     const userId = (req.body || {}).userId || 'anonymous';
-
-    if (!responseUrl) {
-      return res.status(200).json(buildDoorayError('responseUrl 이 없습니다.'));
-    }
-
-    waitUntil(
-      sendDelayedMbtiStart({
-        responseUrl,
-        userId
-      })
-    );
+    const session = mbtiService.createSession(userId);
+    const question = mbtiService.getCurrentQuestion(session.id);
 
     return res.status(200).json(
-      buildDoorayAccepted('MBTI 검사를 시작합니다. 첫 질문을 보내드릴게요.')
+      buildDoorayMbtiQuestionMessage({
+        sessionId: session.id,
+        question,
+        step: 1,
+        total: 4
+      })
     );
   } catch (error) {
     return res.status(200).json(buildDoorayError('MBTI 시작 중 오류가 발생했습니다.'));
@@ -299,13 +213,8 @@ async function createBlindVote(req, res) {
       return res.status(401).json(buildDoorayError('유효하지 않은 appToken 입니다.'));
     }
 
-    const responseUrl = (req.body || {}).responseUrl || '';
     const creatorId = (req.body || {}).userId || 'anonymous';
     const rawText = (req.body || {}).text || '';
-
-    if (!responseUrl) {
-      return res.status(200).json(buildDoorayError('responseUrl 이 없습니다.'));
-    }
 
     if (!rawText) {
       return res.status(200).json(
@@ -313,16 +222,21 @@ async function createBlindVote(req, res) {
       );
     }
 
-    waitUntil(
-      sendDelayedBlindVoteStart({
-        responseUrl,
-        creatorId,
-        rawText
-      })
-    );
+    const parsed = blindVoteService.parseVoteText(rawText);
+    const poll = blindVoteService.createPoll({
+      creatorId,
+      question: parsed.question,
+      options: parsed.options,
+      revealProgress: parsed.revealProgress
+    });
 
     return res.status(200).json(
-      buildDoorayAccepted('익명 투표를 생성하고 있습니다.')
+      buildDoorayBlindVoteMessage(poll, {
+        responseType: 'inChannel',
+        text: parsed.revealProgress
+          ? '익명 투표가 생성되었습니다. 중간 결과 공개: ON'
+          : '익명 투표가 생성되었습니다. 중간 결과 공개: OFF'
+      })
     );
   } catch (error) {
     return res.status(200).json(buildDoorayError('투표 생성 중 오류가 발생했습니다.'));
